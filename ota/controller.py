@@ -35,6 +35,11 @@ class Controller:
         self.active_motor = None
         self.active_dir = None
         self.active_start = 0
+        
+        self.active_start_pos = 0.0   # posição no instante em que arranca
+        self.last_pos_tick = 0        # para throttling de gravação (opcional)
+
+
         self.is_inverting = False
 
         # Memorizar último sentido real (para inversão com motor parado)
@@ -101,6 +106,8 @@ class Controller:
         )
         rs485.send(msg)
 
+    def is_motor_active(self):
+        return self.active_motor is not None
     # --------------------------------------------------
     # Motores
     # --------------------------------------------------
@@ -109,6 +116,10 @@ class Controller:
         self.active_dir = direction
         self.last_dir[motor.id] = direction     # guardar direção real
         self.active_start = time.ticks_ms()
+        
+        key = f"motor{motor.id}"
+        self.active_start_pos = float(self.positions.get(key, 0.0))
+        
         motor.run(direction)
         debug(f"[M{motor.id}] START → {direction}")
 
@@ -117,7 +128,8 @@ class Controller:
             mid = self.active_motor.id
             key = f"motor{mid}"
             self.active_motor.stop()
-            self.update_position(key)
+            # posição já foi atualizada em tempo real, só persistir
+            self.save_positions()
 
         self.active_motor = None
         self.active_dir = None
@@ -205,6 +217,37 @@ class Controller:
             self.positions[key] = max(0, self.positions[key] - delta)
         self.save_positions()
 
+
+    def update_position_live(self):
+        if not self.active_motor or not self.active_dir:
+            return
+
+        key = f"motor{self.active_motor.id}"
+        now = time.ticks_ms()
+        elapsed = time.ticks_diff(now, self.active_start)
+
+        calib = self.calibration.get(key, {})
+        if not calib:
+            return
+
+        base = calib["open_ms"] if self.active_dir == "open" else calib["close_ms"]
+        if base <= 0:
+            return
+
+        delta = (elapsed / base) * 100.0
+
+        if self.active_dir == "open":
+            pos = self.active_start_pos + delta
+        else:
+            pos = self.active_start_pos - delta
+
+        # clamp
+        if pos < 0:
+            pos = 0
+        elif pos > 100:
+            pos = 100
+
+        self.positions[key] = pos
     # --------------------------------------------------
     # Percentagem
     # --------------------------------------------------
@@ -360,8 +403,13 @@ class Controller:
                 self.blink()
                 self.last_led = now
 
-            # Heartbeat
-            if time.ticks_diff(now, self.last_hb) > CONFIG["HEARTBEAT_MS"]:
+            # Atualização contínua da posição enquanto motor está ativo
+            if self.active_motor:
+                self.update_position_live()
+            # Heartbeat dinâmico (standby vs movimento)
+            hb_period = 300 if self.is_motor_active() else 3000
+
+            if time.ticks_diff(now, self.last_hb) >= hb_period:
                 self.heartbeat()
                 self.last_hb = now
 

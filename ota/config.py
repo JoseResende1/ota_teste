@@ -30,7 +30,8 @@ CONFIG_DEFAULTS = {
     # ❤️ HEARTBEAT
     # ==================================================
     "HEARTBEAT_MS": 5000,
-
+    "HEARTBEAT_IDLE_MS": 3000,     # standby
+    "HEARTBEAT_ACTIVE_MS": 300,    # motor a mover
     # ==================================================
     # ⚙️ MOTOR / MOVIMENTO
     # ==================================================
