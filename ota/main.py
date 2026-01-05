@@ -1,6 +1,4 @@
-from app import App
+from core import App
 
 print("MAIN: arranque")
-
-app = App()
-app.run()
+App().run()
