@@ -1,8 +1,8 @@
 # ======================================================
 # main.py
 # ======================================================
-from controller import Controller
+from app.controller import Controller
 
-if __name__ == "__main__":
+def run():
     c = Controller()
     c.loop()

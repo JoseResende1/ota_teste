@@ -2,8 +2,10 @@
 # mcp23017.py — gestão das entradas via MCP23017 (I2C)
 # ======================================================
 from machine import I2C, Pin
-from config import debug
+from app.config import debug
 import time
+
+print("entrou em mcp23017.py")
 
 SDA_PIN = 21
 SCL_PIN = 22

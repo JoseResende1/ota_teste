@@ -4,7 +4,10 @@
 # ======================================================
 from machine import UART, Pin
 import time
-from config import debug
+from app.config import debug
+
+print("entrou em rs485.py")
+
 
 uart = UART(1, baudrate=115200, tx=13, rx=14, timeout=50)
 DE = Pin(5, Pin.OUT)

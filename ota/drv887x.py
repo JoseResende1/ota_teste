@@ -2,8 +2,11 @@
 # drv887x.py — controlo suave DRV8874/8876
 # ======================================================
 from machine import Pin, PWM
-from config import CONFIG, debug
+from app.config import CONFIG, debug
 import time
+
+print("entrou em drv887x.py")
+
 
 class DRV:
     def __init__(self, en_pin, ph_pin, nsleep_pin, motor_id=1):

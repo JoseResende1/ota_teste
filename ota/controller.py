@@ -5,9 +5,11 @@
 
 import time, json, re
 from machine import Pin
-from config import CONFIG, debug
-import rs485, mcp23017
-from drv887x import DRV
+from app.config import CONFIG, debug
+from app import rs485, mcp23017
+from app.drv887x import DRV
+
+print("entrou em controller")
 
 LED = Pin(26, Pin.OUT)
 CALIB_FILE = "calib.json"

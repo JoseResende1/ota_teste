@@ -4,6 +4,8 @@
 # ======================================================
 import json
 
+print("entrou em config")
+
 CONFIG_FILENAME = "config.json"
 
 CONFIG_DEFAULTS = {
