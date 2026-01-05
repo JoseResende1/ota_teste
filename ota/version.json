@@ -1,10 +1,10 @@
 {
-  "version": "3.3.0",
+  "version": "3.4.0",
   "files": {
     "config.py": "bfef8b029207fef1",
     "controller.py": "ee8804495bfcf640",
     "core.py": "2e5bc45225578baa",
-    "main.py": "f388a62ae4191b20",
+    "main.py": "de1ae06165922a1c",
     "motor.py": "e3c1f4c7a8dec6f8",
     "rs485.py": "1a1a6e6f4613043d",
     "utils.py": "22c1d56c4943cd07"
