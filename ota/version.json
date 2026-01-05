@@ -1,9 +1,9 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "files": {
-    "app.py": "e42dafac3dbb1454",
     "config.py": "bfef8b029207fef1",
     "controller.py": "ee8804495bfcf640",
+    "core.py": "2e5bc45225578baa",
     "main.py": "6fc2022899c6f50e",
     "motor.py": "e3c1f4c7a8dec6f8",
     "rs485.py": "1a1a6e6f4613043d",
