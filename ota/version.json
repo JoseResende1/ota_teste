@@ -4,7 +4,7 @@
     "config.py": "4d4faba0457bad63",
     "controller.py": "7de9652495c95fc3",
     "drv887x.py": "e6bde8b2e2d99fc6",
-    "main.py": "d3bc1b9dce830fe5",
+    "main.py": "a0292bebcf5975d5",
     "mcp23017.py": "60656e54019df354",
     "rs485.py": "570b9c153a4e4db4"
   }
