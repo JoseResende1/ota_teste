@@ -1,6 +1,12 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "files": {
-    "main.py": "5d6efe518b3d4f62"
+    "app.py": "e42dafac3dbb1454",
+    "config.py": "bfef8b029207fef1",
+    "controller.py": "ee8804495bfcf640",
+    "main.py": "6fc2022899c6f50e",
+    "motor.py": "e3c1f4c7a8dec6f8",
+    "rs485.py": "1a1a6e6f4613043d",
+    "utils.py": "22c1d56c4943cd07"
   }
 }
