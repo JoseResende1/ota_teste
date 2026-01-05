@@ -1,4 +1,8 @@
-from core import App
+# ======================================================
+# main.py
+# ======================================================
+from controller import Controller
 
-print("MAIN: arranque V4.0")
-App().run()
+if __name__ == "__main__":
+    c = Controller()
+    c.loop()
