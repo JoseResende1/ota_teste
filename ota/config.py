@@ -35,12 +35,29 @@ CONFIG_DEFAULTS = {
     # ==================================================
     # ⚙️ MOTOR / MOVIMENTO
     # ==================================================
-    "MOTOR_TIMEOUT_MS": 15000,
-    "MOTOR_INVERT_DELAY_MS": 500,    # Pausa entre STOP e inversão
+    "MOTOR_TIMEOUT_MS": 30000,
+    "MOTOR_INVERT_DELAY_MS": 1000,    # Pausa entre STOP e inversão
     "LONG_PRESS_MS": 1000,           # 2s para arrancar/inverter
     "SHORT_PRESS_MS": 100,           # 0.5s para parar
     "MOTOR_RAMP_STEP_MS": 1,         # Passo da rampa PWM
     "MOTOR_PWM_FREQ": 20000,         # Frequência PWM inaudível
+    
+    ##leitura de corrente
+    "CURRENT_PERIOD_MS": 300,     # envia de 300 em 300ms quando motor ativo
+    "IPROPI_R_OHMS": 1200.0,      # o teu resistor pulldown
+    "IPROPI_GAIN": 2700.0,        # ajustado para bater 0.48V ~ 1A
+    "CURR_AVG_SAMPLES": 10,        # média para estabilizar
+    
+    
+    # ==================================================
+    # ⚠️ PROTEÇÃO DE CORRENTE
+    # ==================================================
+    "ENABLE_OVERCURRENT_PROTECT": True,
+
+    "OVERCURRENT_LIMIT_A": 0.70,        # limite em amperes
+    "OVERCURRENT_SAMPLES": 3,            # nº leituras consecutivas
+    "OVERCURRENT_PERIOD_MS": 100,        # período de amostragem
+
 
     # ==================================================
     # 🧲 FINS DE CURSO

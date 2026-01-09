@@ -1,10 +1,10 @@
 {
-  "version": "1.1.1",
+  "version": "1.0.0",
   "files": {
-    "config.py": "946a7619462017b1",
-    "controller.py": "9db558bbd50659f5",
+    "config.py": "d1ea0af7698aae4e",
+    "controller.py": "c4ebf5fda1cc5d0e",
     "drv887x.py": "e6bde8b2e2d99fc6",
-    "main.py": "66c127e916081635",
+    "main.py": "ae91544a6786cde3",
     "mcp23017.py": "60656e54019df354",
     "rs485.py": "570b9c153a4e4db4"
   }
