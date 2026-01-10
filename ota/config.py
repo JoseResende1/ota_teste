@@ -13,7 +13,12 @@ CONFIG_DEFAULTS = {
     # 🐞 DEBUG E LOGS
     # ==================================================
     "DEBUG": True,
-
+    # ==================================================
+    # 🌐 OTA
+    # ==================================================
+    "OTA_ENABLED": True,
+    
+    
     # ==================================================
     # 💡 LED
     # ==================================================
@@ -50,14 +55,16 @@ CONFIG_DEFAULTS = {
     
     
     # ==================================================
-    # ⚠️ PROTEÇÃO DE CORRENTE
+    #  PROTEÇÃO DE CORRENTE
     # ==================================================
+    
     "ENABLE_OVERCURRENT_PROTECT": True,
+    "OVERCURRENT_LIMIT_A": 4.0,
+    "OVERCURRENT_STARTUP_IGNORE_MS": 700, 
+    
+  
 
-    "OVERCURRENT_LIMIT_A": 0.70,        # limite em amperes
-    "OVERCURRENT_SAMPLES": 3,            # nº leituras consecutivas
-    "OVERCURRENT_PERIOD_MS": 100,        # período de amostragem
-
+ 
 
     # ==================================================
     # 🧲 FINS DE CURSO
@@ -100,3 +107,4 @@ def load_config():
     except Exception:
         debug("Usando configurações por defeito.")
         CONFIG.update(CONFIG_DEFAULTS)
+

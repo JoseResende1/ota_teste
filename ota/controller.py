@@ -10,7 +10,8 @@ from app import rs485, mcp23017
 from app.drv887x import DRV
 from machine import ADC
 from machine import WDT
-
+from app.config import save_config
+import machine
 
 
 print("entrou em controller")
@@ -22,10 +23,10 @@ POS_FILE = "pos.json"
 
 class Controller:
     def __init__(self):
-        self.wdt = WDT(timeout=5000)  # timeout em ms (ex: 5 segundos)
+        self.wdt = WDT(timeout=6000)  # timeout em ms (ex: 5 segundos)
         debug("WDT iniciado (5s)")
         
-        
+         
         mcp23017.init()
         self.addr = mcp23017.address()
         self.broadcast = CONFIG.get("BROADCAST_ADDR", 128)
@@ -74,9 +75,7 @@ class Controller:
         self.last_action_time = 0
         self.last_action_type = None
         
-        # --- Proteção de corrente ---
-        self.overcurrent_count = {1: 0, 2: 0}
-        self.overcurrent_latched = {1: False, 2: False}
+
 
         # Botões
         self.btn1_pressed = False
@@ -92,6 +91,25 @@ class Controller:
 
         rs485.set_rx()
         debug("Sistema iniciado com calibração completa e gestos manuais inteligentes.")
+
+    #-------------
+    #ENABLE OTA
+    #-------------
+    def enable_ota(self):
+        if self.active_motor:
+            self.stop_motor()
+
+        CONFIG["OTA_ENABLED"] = True
+        save_config()
+        rs485.send(f"ACK,ADDR:{self.addr},OTA_ENABLED")
+        debug("[OTA] OTA armada — reboot manual necessário")
+
+    def disable_ota(self):
+        CONFIG["OTA_ENABLED"] = False
+        save_config()
+        rs485.send(f"ACK,ADDR:{self.addr},OTA_DISABLED")
+        debug("[OTA] OTA desativada")
+
 
     # --------------------------------------------------
     # Persistência
@@ -185,12 +203,17 @@ class Controller:
     # Calibração completa (2 ciclos) — terminar FECHADO (0%)
     # --------------------------------------------------
     def calibrate_motor(self, motor):
+        if self.active_motor:
+            debug("[CALIB] Ignorado — motor em movimento")
+            return pressed, t_press
+        
         debug(f"[CALIB] Iniciar calibração completa M{motor.id}")
 
         def move_until(direction, endstop_key, timeout=20000):
             self.start_motor(motor, direction)
             t0 = time.ticks_ms()
             while True:
+                self.wdt.feed() 
                 es = mcp23017.endstops_and_faults()
                 if es[endstop_key]:
                     break
@@ -459,8 +482,14 @@ class Controller:
             self.calibrate_motor(self.m1)
         elif su == "CALIBRAR2":
             self.calibrate_motor(self.m2)
+            
+        elif su == "OTA ON":
+            self.enable_ota()
 
-        rs485.send(f"ACK {cmd}")
+        elif su == "OTA OFF":
+            self.disable_ota()
+
+        
 
 
 
@@ -512,23 +541,36 @@ class Controller:
         if not CONFIG.get("ENABLE_OVERCURRENT_PROTECT", True):
             return False
 
-        if self.overcurrent_latched[motor_id]:
-            return True
+        # 🔕 Ignorar durante o arranque
+        ignore_ms = CONFIG.get("OVERCURRENT_STARTUP_IGNORE_MS", 0)
+        if time.ticks_diff(time.ticks_ms(), self.active_start) < ignore_ms:
+            return False
 
         v, i = self.read_motor_current(motor_id)
-
-        limit = CONFIG.get("OVERCURRENT_LIMIT_A", 1.2)
+        limit = float(CONFIG.get("OVERCURRENT_LIMIT_A", 1.2))
 
         if i > limit:
-            self.overcurrent_count[motor_id] += 1
-            debug(f"[OC] M{motor_id} {i:.2f}A > {limit:.2f}A "
-                  f"({self.overcurrent_count[motor_id]})")
-        else:
-            self.overcurrent_count[motor_id] = 0
+            debug(f"[EMERG] M{motor_id} OVERCURRENT {i:.2f}A > {limit:.2f}A")
 
-        if self.overcurrent_count[motor_id] >= CONFIG.get("OVERCURRENT_SAMPLES", 3):
-            self.overcurrent_latched[motor_id] = True
-            self.handle_overcurrent_trip(motor_id, v, i)
+            # parar imediatamente
+            if self.active_motor and self.active_motor.id == motor_id:
+                self.active_motor.stop()
+
+            self.active_motor = None
+            self.active_dir = None
+
+            # mensagem RS485 (sempre enviada)
+            msg = (
+                f"ALERT,ADDR:{self.addr},"
+                f"M{motor_id}_OVERCURRENT,"
+                f"I:{i:.2f}A,V:{v:.2f}V"
+            )
+            rs485.send(msg)
+
+            # heartbeat imediato
+            self.heartbeat()
+            self.last_hb = time.ticks_ms()
+
             return True
 
         return False
@@ -655,4 +697,3 @@ class Controller:
 
                 
             
-
