@@ -75,7 +75,8 @@ class Controller:
         self.last_action_time = 0
         self.last_action_type = None
         
-
+        #posição requerida via rs485
+        self.target_pos = {1: None, 2: None}
 
         # Botões
         self.btn1_pressed = False
@@ -87,7 +88,14 @@ class Controller:
 
         # Timers
         self.last_led = time.ticks_ms()
-        self.last_hb = time.ticks_ms()
+        now = time.ticks_ms()
+
+        hb_offset = CONFIG.get("HEARTBEAT_ADDR_OFFSET_MS", 0) * self.addr
+        self.last_hb = time.ticks_add(now, hb_offset)
+
+        debug(f"[HB] Offset aplicado: {hb_offset} ms (ADDR={self.addr})")
+
+        self.last_led = now
 
         rs485.set_rx()
         debug("Sistema iniciado com calibração completa e gestos manuais inteligentes.")
@@ -202,61 +210,139 @@ class Controller:
     # --------------------------------------------------
     # Calibração completa (2 ciclos) — terminar FECHADO (0%)
     # --------------------------------------------------
+    
+    def _calib_abort(self, motor_id, reason="TIMEOUT"):
+        debug(f"[CALIB] ABORT M{motor_id} reason={reason}")
+
+        try:
+            if self.active_motor:
+                self.active_motor.stop()
+        except:
+            pass
+
+        self.active_motor = None
+        self.active_dir = None
+
+        rs485.send(f"FAULT,ADDR:{self.addr},CALIB_ABORT_M{motor_id},{reason}")
+        self.heartbeat()
+        self.last_hb = time.ticks_ms()
+
+
     def calibrate_motor(self, motor):
+        # --------------------------------------------------
+        # Proteções iniciais
+        # --------------------------------------------------
         if self.active_motor:
-            debug("[CALIB] Ignorado — motor em movimento")
-            return pressed, t_press
-        
-        debug(f"[CALIB] Iniciar calibração completa M{motor.id}")
+            debug("[CALIB] Ignorado — motor já em movimento")
+            return
+
+        mid = motor.id
+        key = f"motor{mid}"
+
+        debug(f"[CALIB] Iniciar calibração completa M{mid}")
+
+        # marca como “ocupado” (ajuda no heartbeat / impedir comandos)
+        self.active_motor = motor
+        self.active_dir = "calib"
+        self.active_start = time.ticks_ms()
+        self.active_start_pos = float(self.positions.get(key, 0.0))
+
+        last_hb = time.ticks_ms()
+        last_curr = time.ticks_ms()
 
         def move_until(direction, endstop_key, timeout=20000):
+            nonlocal last_hb, last_curr  # ✅ FIX do NameError
+
+            # arrancar e preparar estado para cálculo de posição
             self.start_motor(motor, direction)
             t0 = time.ticks_ms()
+
             while True:
-                self.wdt.feed() 
+                now = time.ticks_ms()
+
+                # watchdog
+                self.wdt.feed()
+
+                # posição live (para debug/RS485/target)
+                self.update_position_live()
+
+                # heartbeat “ativo” durante calibração
+                if time.ticks_diff(now, last_hb) >= CONFIG["HEARTBEAT_ACTIVE_MS"]:
+                    self.heartbeat()
+                    last_hb = now
+
+                # (opcional) corrente durante calibração, se quiseres
+                if CONFIG.get("SEND_CURR_DURING_CALIB", True):
+                    if time.ticks_diff(now, last_curr) >= CONFIG["CURRENT_PERIOD_MS"]:
+                        self.send_current_status(mid)
+                        # se quiseres proteção também na calibração:
+                        # if self.check_overcurrent(mid):
+                        #     return None
+                        last_curr = now
+
                 es = mcp23017.endstops_and_faults()
+
                 if es[endstop_key]:
                     break
-                if time.ticks_diff(time.ticks_ms(), t0) > timeout:
+
+                if time.ticks_diff(now, t0) > timeout:
                     motor.stop()
-                    debug("CALIB TIMEOUT")
+                    debug(f"[CALIB] TIMEOUT {direction.upper()} M{mid}")
                     return None
+
                 time.sleep_ms(10)
+
             motor.stop()
             return time.ticks_diff(time.ticks_ms(), t0)
 
-        # ciclo 1
-        t_close_1 = move_until("close", f"m{motor.id}_close")
-        time.sleep_ms(200)
-        t_open_1 = move_until("open", f"m{motor.id}_open")
+        # --------------------------------------------------
+        # CICLO 1: FECHAR -> ABRIR
+        # --------------------------------------------------
+        t_close_1 = move_until("close", f"m{mid}_close")
+        if t_close_1 is None:
+            self._calib_abort(mid, "TIMEOUT_CLOSE_1")
+            return
         time.sleep_ms(200)
 
-        # ciclo 2
-        t_close_2 = move_until("close", f"m{motor.id}_close")
+        t_open_1 = move_until("open", f"m{mid}_open")
+        if t_open_1 is None:
+            self._calib_abort(mid, "TIMEOUT_OPEN_1")
+            return
         time.sleep_ms(200)
 
-        # NÃO abre no final → termina fechado (0%)
-        # tempos abertos: só do ciclo 1 e fase de abertura do ciclo 1
-        t_open_2 = t_open_1
+        # --------------------------------------------------
+        # CICLO 2: FECHAR (termina FECHADO)
+        # --------------------------------------------------
+        t_close_2 = move_until("close", f"m{mid}_close")
+        if t_close_2 is None:
+            self._calib_abort(mid, "TIMEOUT_CLOSE_2")
+            return
+        time.sleep_ms(200)
 
+        # --------------------------------------------------
+        # Guardar calibração
+        # --------------------------------------------------
         t_close = int((t_close_1 + t_close_2) / 2)
-        t_open = int((t_open_1 + t_open_2) / 2)
+        t_open = int(t_open_1)  # (não fazes 2ª abertura, portanto usa a 1ª)
 
-        key = f"motor{motor.id}"
         self.calibration[key] = {"open_ms": t_open, "close_ms": t_close}
         self.save_calibration()
 
-        # posição final = 0% (fechado)
-        self.positions[key] = 0
+        # posição final = fechado
+        self.positions[key] = 0.0
         self.save_positions()
 
-        rs485.send(
-            f"ACK ADDR:{self.addr} CALIB M{motor.id} OPEN:{t_open} CLOSE:{t_close}"
-        )
+        # limpar estado “ativo”
+        self.active_motor = None
+        self.active_dir = None
+        self.calib_missing_sent[mid] = False
 
-        debug(f"[CALIB] M{motor.id} FINAL POS=0% (fechado)")
+        rs485.send(f"ACK ADDR:{self.addr} CALIB M{mid} OPEN:{t_open} CLOSE:{t_close}")
+        debug(f"[CALIB] M{mid} FINAL POS=0% (fechado)")
 
-        self.calib_missing_sent[motor.id] = False
+        # heartbeat final consistente
+        self.heartbeat()
+        self.last_hb = time.ticks_ms()
 
     #---------------------
     #VERIFICAÇÃO DE FALTA DE CALIBRAÇÃO
@@ -459,7 +545,8 @@ class Controller:
         if m:
             pct = int(m.group(1))
             motor = self.m1 if int(m.group(2)) == 1 else self.m2
-            self.move_to_percent(motor, pct)
+            self.target_pos[motor.id] = pct
+            debug(f"[CMD] M{motor.id} target={pct}%")
             return
 
         def run(motor, d):
@@ -614,6 +701,24 @@ class Controller:
                 self.last_led = now
 
             # --------------------------------------------------
+            # EXECUÇÃO DE TARGET (RS485)
+            # --------------------------------------------------
+            if not self.active_motor:
+                for mid, tgt in self.target_pos.items():
+                    if tgt is None:
+                        continue
+
+                    key = f"motor{mid}"
+                    cur = self.positions[key]
+                    if abs(tgt - cur) < 1:
+                        self.target_pos[mid] = None
+                        continue
+
+                    motor = self.m1 if mid == 1 else self.m2
+                    direction = "open" if tgt > cur else "close"
+                    self.start_motor(motor, direction)
+                    break
+            # --------------------------------------------------
             # MOTOR ATIVO
             # --------------------------------------------------
             if self.active_motor:
@@ -641,8 +746,11 @@ class Controller:
             # MCP23017 / Botões
             # --------------------------------------------------
             gpa = mcp23017.read_reg(0x12)
-            b1 = (gpa >> 4) & 1
-            b2 = (gpa >> 5) & 1
+            btn1_bit = CONFIG["BTN_M1_BIT"]
+            btn2_bit = CONFIG["BTN_M2_BIT"]
+
+            b1 = (gpa >> btn1_bit) & 1
+            b2 = (gpa >> btn2_bit) & 1
             es = mcp23017.endstops_and_faults()
 
             self.btn1_pressed, self.btn1_press_time = self.handle_button(
@@ -673,6 +781,15 @@ class Controller:
                 elif time.ticks_diff(now, self.active_start) > CONFIG["MOTOR_TIMEOUT_MS"]:
                     rs485.send(f"FAULT,ADDR:{self.addr},M{mid}_TIMEOUT")
                     debug(f"[FAULT] TIMEOUT M{mid}")
+                    self.stop_motor()
+                    
+            # Parar ao atingir target
+            tgt = self.target_pos.get(mid)
+            if tgt is not None:
+                if (self.active_dir == "open" and self.positions[key] >= tgt) or \
+                   (self.active_dir == "close" and self.positions[key] <= tgt):
+                    self.positions[key] = tgt
+                    self.target_pos[mid] = None
                     self.stop_motor()
 
             # --------------------------------------------------

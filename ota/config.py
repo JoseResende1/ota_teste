@@ -18,6 +18,22 @@ CONFIG_DEFAULTS = {
     # ==================================================
     "OTA_ENABLED": True,
     
+    # ==================================================
+    # MCP23017 MAPEAMENTO
+    # ==================================================
+
+    # Botões manuais (GPIO A)
+    "BTN_M1_BIT": 6,   # GPA6
+    "BTN_M2_BIT": 7,   # GPA7
+
+    # Fins de curso Motor 1
+    "M1_OPEN_BIT": 0,   # GPA0
+    "M1_CLOSE_BIT": 1,  # GPA1
+
+    # Fins de curso Motor 2 (NOVO)
+    "M2_OPEN_BIT": 3,   # GPA3
+    "M2_CLOSE_BIT": 4,  # GPA4
+
     
     # ==================================================
     # 💡 LED
@@ -37,6 +53,8 @@ CONFIG_DEFAULTS = {
     "HEARTBEAT_MS": 5000,
     "HEARTBEAT_IDLE_MS": 3000,     # standby
     "HEARTBEAT_ACTIVE_MS": 300,    # motor a mover
+    "HEARTBEAT_ADDR_OFFSET_MS": 100, # RS485 / HEARTBEAT OFFSET
+    
     # ==================================================
     # ⚙️ MOTOR / MOVIMENTO
     # ==================================================

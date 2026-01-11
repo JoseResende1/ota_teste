@@ -1,11 +1,11 @@
 {
-  "version": "1.8.0",
+  "version": "1.1.0",
   "files": {
-    "config.py": "7a9cd2943352693c",
-    "controller.py": "b5eb208bfe8b50b1",
+    "config.py": "b1c84974b54886f4",
+    "controller.py": "15a82deba6e02b9c",
     "drv887x.py": "e6bde8b2e2d99fc6",
     "main.py": "28c0ac7b8632ab8d",
-    "mcp23017.py": "60656e54019df354",
+    "mcp23017.py": "e03aec448193e3f2",
     "rs485.py": "570b9c153a4e4db4"
   }
 }

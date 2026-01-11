@@ -2,7 +2,7 @@
 # mcp23017.py — gestão das entradas via MCP23017 (I2C)
 # ======================================================
 from machine import I2C, Pin
-from app.config import debug
+from app.config import CONFIG, debug
 import time
 
 print("entrou em mcp23017.py")
@@ -55,41 +55,21 @@ def address():
 
 # ------------------------------------------------------
 def endstops_and_faults():
-    """
-    Fins de curso: ATIVOS em HIGH (1).
-      - GPA0 → FA1 (aberto M1)
-      - GPA1 → FC1 (fechado M1)
-      - GPA2 → FA2 (aberto M2)
-      - GPA3 → FC2 (fechado M2)
-    NFAULT: ativo em LOW (0).
-    """
-    global _last_state
-
     gpa = read_reg(0x12)
     gpb = read_reg(0x13)
 
-    # ENDSTOPS = ACTIVE HIGH
-    fa1 = bool(gpa & (1 << 0))  # GPA0
-    fc1 = bool(gpa & (1 << 1))  # GPA1
-    fa2 = bool(gpa & (1 << 2))  # GPA2
-    fc2 = bool(gpa & (1 << 3))  # GPA3
-
-    # NFAULT = ACTIVE LOW -> True quando há FALHA
-    nf1 = not bool(gpb & (1 << 6))  # GPB6
-    nf2 = not bool(gpb & (1 << 7))  # GPB7
+    def bit(val, n):
+        return bool(val & (1 << n))
 
     state = {
-        "m1_open":  fa1,
-        "m1_close": fc1,
-        "m2_open":  fa2,
-        "m2_close": fc2,
-        "nf1": nf1,
-        "nf2": nf2,
-    }
+        "m1_open":  bit(gpa, CONFIG["M1_OPEN_BIT"]),
+        "m1_close": bit(gpa, CONFIG["M1_CLOSE_BIT"]),
+        "m2_open":  bit(gpa, CONFIG["M2_OPEN_BIT"]),
+        "m2_close": bit(gpa, CONFIG["M2_CLOSE_BIT"]),
 
-    if state != _last_state:
-        debug(f"[MCP] GPA={bin(gpa)} GPB={bin(gpb)} -> "
-              f"FA1:{fa1} FC1:{fc1} FA2:{fa2} FC2:{fc2} NF1:{nf1} NF2:{nf2}")
-        _last_state = state.copy()
+        # NFAULT continuam no GPB
+        "nf1": not bit(gpb, 6),
+        "nf2": not bit(gpb, 7),
+    }
 
     return state
